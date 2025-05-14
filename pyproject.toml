@@ -8,9 +8,10 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.10"
 pandas = "^2.2.3"
-scipy = "^1.15.3"
+scipy = ">=1.13.0"
+numpy = ">=1.26.0"
 ipykernel = "^6.29.5"
 
 [tool.poetry.group.dev.dependencies]
