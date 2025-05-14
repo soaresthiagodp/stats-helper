@@ -1,0 +1,1 @@
+from statshelper.BaseStatistics import StatisticsInfo #noqa
