@@ -59,35 +59,57 @@ class StatisticsInfo:
     @staticmethod
     def get_z_critical(confidence: float) -> float:
         """Get critical z-value for a given confidence level."""
-        return norm.ppf(1 - (1 - confidence)/2)
+        return float(norm.ppf(1 - (1 - confidence)/2))
     
     @staticmethod
     def get_t_critical(confidence: float, df: int) -> float:
         """Get critical t-value for a given confidence level and degrees of freedom."""
-        return t.ppf(1 - (1 - confidence)/2, df)
+        return float(t.ppf(1 - (1 - confidence)/2, df))
     
     @staticmethod
-    def calculate_bin_width(data: np.typing.ArrayLike, num_bins: int) -> float:
-        """Calculate the width of histogram bins based on Sturges Rule.
+    def calculate_bin_width(
+        data: np.typing.ArrayLike, 
+        rule: Literal["sturges", "sqrt", "rice"] = "sturges"
+    ) -> tuple[int, float]:
+        """Calculate optimal histogram bin width and count using specified rule.
+        
+        Supports three common binning strategies:
+        - Sturges' Rule (default): Ideal for normal distributions, smaller datasets
+        - Square Root Rule: Simpler alternative for uniform distributions
+        - Rice Rule: Better for larger datasets
         
         Args:
-            data: Input data (array-like).
-            num_bins: Desired number of bins.
-            
+            data: Input data (array-like). Will be converted to numpy array.
+            rule: Binning rule to use. One of:
+                - "sturges": k = ceil(1 + 3.322*log10(n))
+                - "sqrt": k = ceil(sqrt(n))
+                - "rice": k = ceil(2*n^(1/3))
+                Defaults to "sturges".
+                
         Returns:
-            Bin width rounded to 2 decimal places.
+            Tuple containing:
+            - num_bins (int): Number of bins (always rounded up to integer)
+            - bin_width (float): Width of each bin (rounded to 2 decimal places)
             
         Raises:
-            ValueError: If input is invalid or num_bins <= 0.
-        """
-        if num_bins <= 0:
-            raise ValueError("num_bins must be > 0.")
-        
+            ValueError: If input data is empty or contains non-numeric values,
+                or if invalid rule is specified.
+        """ 
         arr = StatisticsInfo._validate_and_convert_array(data)
+        n = len(arr)
         
-        amplitude = np.max(arr) - np.min(arr)
-        bin_value = 1 + 3.322 * np.log10(num_bins)
-        return np.round(amplitude / bin_value, 2)
+        match rule:
+            case "sturges":
+                num_bins = math.ceil(1 + 3.322 * np.log10(n)) if n > 0 else 1
+            case "sqrt":
+                num_bins = math.ceil(np.sqrt(n))
+            case "rice":
+                num_bins = math.ceil(2 * (n ** (1/3)))
+            case _:
+                raise ValueError("Invalid rule. Use 'sturges', 'sqrt', or 'rice'.")
+        
+        bin_width = float(np.round((np.max(arr) - np.min(arr)) / num_bins, 2))
+        return num_bins, bin_width
     
     @staticmethod
     def _validate_and_convert_array(data: np.typing.ArrayLike, min_length: int = 1) -> np.ndarray:
@@ -121,7 +143,7 @@ class StatisticsInfo:
         confidence: float,
         error: float,
         std_dev: float,
-        population_size: int = None
+        population_size: int | None = None
     ) -> int:
         """
         Calculate the required sample size for a given confidence level and margin of error.
@@ -239,7 +261,7 @@ class StatisticsInfo:
         confidence: float,
         error: float,
         p: float,
-        population_size: int = None 
+        population_size: int | None = None 
     ) -> int:
         """
         Calculate the required sample size for a given confidence level and margin of error.
@@ -355,7 +377,7 @@ class StatisticsInfo:
         return inferior_limit, superior_limit
     
     @staticmethod
-    def detect_outliers(series: pd.Series, method: str = 'iqr', threshold: float = None) -> pd.Series:
+    def detect_outliers(series: pd.Series, method: str = 'iqr', threshold: float | None = None) -> pd.Series:
         if method not in ['iqr','zscore', 'mad']:
             raise ValueError("Invalid method. Use 'iqr', 'zscore', or 'mad'.")
         

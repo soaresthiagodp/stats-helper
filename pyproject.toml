@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "stats-helper"
 version = "0.1.0"
-description = ""
+description = "A Python library for statistical helper functions, useful for students."
 authors = ["Thiago Soares <soaresthiagdp@gmail.com>"]
 packages = [
     { include = "statshelper", from = "src" }
@@ -12,10 +12,10 @@ python = ">=3.10"
 pandas = "^2.2.3"
 scipy = ">=1.13.0"
 numpy = ">=1.26.0"
-ipykernel = "^6.29.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]

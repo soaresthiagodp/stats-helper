@@ -70,10 +70,17 @@ class TestStatisticsInfo:
         
     def test_calculate_bin_width(self):
         data = np.arange(100)
-        assert StatisticsInfo.calculate_bin_width(data, 10) == pytest.approx(22.91, abs=0.01)
+        num_bins, bin_width = StatisticsInfo.calculate_bin_width(data)
         
-        with pytest.raises(ValueError):
-            StatisticsInfo.calculate_bin_width(data, 0)
+        # Verify Sturges Rule calculation
+        assert num_bins == 8
+        assert bin_width == pytest.approx(12.38, abs=0.01)
+        
+        # Test edge case with small dataset
+        small_data = [1, 2, 3]
+        small_bins, small_width = StatisticsInfo.calculate_bin_width(small_data)
+        assert small_bins == 3
+        assert small_width == pytest.approx(0.67, abs=0.01)
     
     # Test Mean Related Functions
     def test_calculate_mean_sample_size(self):
