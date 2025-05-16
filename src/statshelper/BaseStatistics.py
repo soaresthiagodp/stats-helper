@@ -225,6 +225,32 @@ class StatisticsInfo:
         is_sample_std: bool,
         print_evaluation: bool = False,
     ):
+        """Perform a one-sample hypothesis test for means (Z-test or t-test).
+    
+        Conducts either:
+        - Z-test when population standard deviation is known (is_sample_std=False)
+        - t-test when using sample standard deviation (is_sample_std=True)
+
+        Args:
+            data_size: Sample size (n).
+            sample_mean: Observed sample mean (x).
+            std_dev: Standard deviation (sigma if population, s if sample).
+            significance: Significance level (alpha) for the test.
+            hypothesis_mean: Hypothesized population mean (mu0).
+            alternative: Alternative hypothesis type:
+                - 'left': x < mu0 (one-tailed)
+                - 'right': x > mu0 (one-tailed)
+                - 'two-sided': x != mu0 (two-tailed)
+            is_sample_std: Whether std_dev is from sample (t-test if True else z-test)
+            print_evaluation: If True, prints test statistics and decision.
+
+        Returns:
+            p-value for the specified alternative hypothesis.
+
+        Raises:
+            ValueError: If invalid alternative hypothesis is specified
+        """
+        
         std_error = std_dev / np.sqrt(data_size)
         stat = (sample_mean - hypothesis_mean) / std_error
         
@@ -341,6 +367,29 @@ class StatisticsInfo:
         alternative: Literal["left", "right", "two-sided"],
         print_evaluation: bool = False,
     ):
+        """Perform a one-sample Z-test for proportions using normal approximation.
+    
+        Tests whether the observed sample proportion differs significantly from
+        a hypothesized population proportion. Uses the standard normal distribution
+        (Z-test) which is valid when np ≥ 5 and n(1-p) ≥ 5.
+
+        Args:
+            data_size: Sample size (n).
+            sample_proportion: Observed proportion in sample (p̂).
+            significance: Significance level (alpha) for hypothesis test.
+            hypothesis_proportion: Hypothesized population proportion (p0).
+            alternative: Type of alternative hypothesis:
+                - 'left': p < p0 (one-tailed)
+                - 'right': p > p0 (one-tailed)
+                - 'two-sided': pp != p0 (two-tailed)
+            print_evaluation: If True, prints test statistics and decision.
+
+        Returns:
+            p-value for the test.
+
+        Raises:
+            ValueError: If invalid alternative hypothesis is provided
+        """
         std_error = np.sqrt(hypothesis_proportion*(1-hypothesis_proportion)/data_size)
         stat = (sample_proportion - hypothesis_proportion) / std_error
         
