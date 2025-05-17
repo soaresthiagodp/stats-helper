@@ -172,7 +172,97 @@ class TestStatisticsInfo:
             alternative="two-sided"
         )
         assert p_two == pytest.approx(0.05777, abs=0.001)
-    
+
+    def test_compare_variances_f_test(self):
+        """Test with equal variances (should not reject null)."""
+        p_value = StatisticsInfo.compare_variances_f_test(
+            variance_1=4.0,
+            variance_2=4.0,
+            size_1=30,
+            size_2=30,
+            significance=0.05,
+            alternative="two-sided"
+        )
+        assert p_value == 1.0  # Exactly equal variances should give p=1
+
+        """Test with clearly unequal variances (should reject null)."""
+        p_value = StatisticsInfo.compare_variances_f_test(
+            variance_1=9.0,
+            variance_2=1.0,
+            size_1=30,
+            size_2=30,
+            significance=0.05,
+            alternative="two-sided"
+        )
+        assert p_value < 0.05
+
+        """Test right-tailed alternative (v1 > v2)."""
+        p_value = StatisticsInfo.compare_variances_f_test(
+            variance_1=5.0,
+            variance_2=2.0,
+            size_1=20,
+            size_2=20,
+            significance=0.05,
+            alternative="right"
+        )
+        # Should be significant since 5 > 2
+        assert p_value < 0.05
+
+        """Test left-tailed alternative (v1 < v2)."""
+        p_value = StatisticsInfo.compare_variances_f_test(
+            variance_1=2.0,
+            variance_2=5.0,
+            size_1=20,
+            size_2=20,
+            significance=0.05,
+            alternative="left"
+        )
+        # Should be significant since 2 < 5
+        assert p_value < 0.05
+
+    def test_normal_distribution(self):
+        """Test with normally distributed data."""
+        # Generate normal data
+        np.random.seed(42)
+        normal_data = np.random.normal(loc=0, scale=1, size=100)
+        
+        results = StatisticsInfo.normality_tests(normal_data)
+        
+        # Check all tests are present
+        assert set(results.keys()) == {'shapiro-wilk', 'kolmogorov-smirnov', 'anderson-darling'}
+        
+        # Shapiro-Wilk - should not reject normality
+        assert 0.9 <= results['shapiro-wilk']['statistic'] <= 1.0
+        assert results['shapiro-wilk']['p_value'] > 0.05
+        
+        # Kolmogorov-Smirnov - should not reject normality
+        assert results['kolmogorov-smirnov']['statistic'] < 0.1
+        assert results['kolmogorov-smirnov']['p_value'] > 0.05
+        
+        # Anderson-Darling - test statistic should be less than critical value at 5%
+        critical_5pct = results['anderson-darling']['critical_values'][2]  # 5% is at index 2
+        assert results['anderson-darling']['statistic'] < critical_5pct
+
+    def test_non_normal_distribution(self):
+        """Test with clearly non-normal data (exponential)."""
+        # Generate exponential data
+        np.random.seed(42)
+        exp_data = np.random.exponential(scale=1.0, size=100)
+        
+        results = StatisticsInfo.normality_tests(exp_data)
+        
+        # Shapiro-Wilk - should reject normality
+        assert results['shapiro-wilk']['statistic'] < 0.9
+        assert results['shapiro-wilk']['p_value'] <= 0.05
+        
+        # Kolmogorov-Smirnov - should reject normality
+        assert results['kolmogorov-smirnov']['statistic'] > 0.1
+        assert results['kolmogorov-smirnov']['p_value'] <= 0.05
+        
+        # Anderson-Darling - test statistic should exceed critical value at 5%
+        critical_5pct = results['anderson-darling']['critical_values'][2]
+        assert results['anderson-darling']['statistic'] > critical_5pct
+
     # Test Outlier Detection
     def test_get_outlier_limit(self):
         s = pd.Series([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100])

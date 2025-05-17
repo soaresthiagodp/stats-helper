@@ -4,7 +4,8 @@ from typing import Literal
 
 import pandas as pd
 import numpy as np
-from scipy.stats import norm, t, zscore
+from scipy.stats import norm, f, t, shapiro, kstest, anderson, zscore
+
 
 class StatisticsInfo:
     # region: Utilities
@@ -224,7 +225,7 @@ class StatisticsInfo:
         alternative: Literal["left", "right", "two-sided"],
         is_sample_std: bool,
         print_evaluation: bool = False,
-    ):
+    ) -> float:
         """Perform a one-sample hypothesis test for means (Z-test or t-test).
     
         Conducts either:
@@ -278,7 +279,7 @@ class StatisticsInfo:
             print(f"{p_value=:.5f}")
             print(f"{decision=}")
         
-        return p_value
+        return float(p_value)
     # endregion: Mean related
     
     # region: Proportion related
@@ -366,7 +367,7 @@ class StatisticsInfo:
         hypothesis_proportion: float,
         alternative: Literal["left", "right", "two-sided"],
         print_evaluation: bool = False,
-    ):
+    ) -> float:
         """Perform a one-sample Z-test for proportions using normal approximation.
     
         Tests whether the observed sample proportion differs significantly from
@@ -411,9 +412,151 @@ class StatisticsInfo:
             print(f"{p_value=:.5f}")
             print(f"{decision=}")
         
-        return p_value
+        return float(p_value)
     # endregion: Proportion related
     
+    # region: Hypothesis Test
+    @staticmethod
+    def compare_variances_f_test(
+        variance_1: float,
+        variance_2: float,
+        size_1: int,
+        size_2: int,
+        significance: float,
+        alternative: Literal["left", "right", "two-sided"],
+        print_evaluation: bool = False,
+    ) -> float:
+        """Perform a F-test for equality of variances.
+        
+        Uses F-distribution where F = S1²/S2² (with S1² > S2²).
+
+        Args:
+            variance_1: Variance of sample 1.
+            variance_2: Variance of sample 2.
+            size_1: Sample size of group 1.
+            size_2: Sample size of group 2.
+            significance: Significance level (alpha).
+            print_evaluation: If True, prints test statistics and decision.
+
+        Returns:
+            Two-tailed p-value for the F-test.
+
+        Raises:
+            ValueError: If sample variances are non-positive or sample sizes < 2.
+
+        Notes:
+            - For non-normal data, consider Levene's test instead.
+            - Sensitive to normality assumption.
+        """
+        # TODO: Levene Test
+        # Validate inputs
+        if variance_1 <= 0 or variance_2 <= 0:
+            raise ValueError("Sample variances must be positive")
+        if size_1 < 2 or size_2 < 2:
+            raise ValueError("Sample sizes must be >=2 2")
+
+        f_stat = variance_1 / variance_2
+        df_num = size_1 - 1
+        df_den = size_2 - 1
+
+        # TODO: Study about the swap logic and implement if necessary
+        # if variance_1 >= variance_2:
+        #     f_stat = variance_1 / variance_2
+        #     df_num = size_1 - 1
+        #     df_den = size_2 - 1
+        # else:
+            # f_stat = variance_2 / variance_1
+            # df_num = size_2 - 1
+            # df_den = size_1 - 1
+
+        match alternative:
+            case "left":
+                # TODO: Verify if this is the correct approach
+                p_value = f.cdf(f_stat, df_num, df_den)
+            case "right":
+                # TODO: Verify if this is the correct approach
+                p_value = f.sf(f_stat, df_num, df_den)
+            case "two-sided":
+                if f_stat > 1:
+                    p_value = 2 * f.sf(f_stat, df_num, df_den)
+                else:
+                    p_value = 2 * f.cdf(f_stat, df_num, df_den)
+            case _:
+                raise ValueError("Invalidade alternative: must be 'left', 'right' or 'two-sided'")
+
+        if print_evaluation:
+            decision = "Reject H0" if p_value < significance else "Accept H0"
+            print(f"F_stat={f_stat:.4f} df_num={df_num} df_den={df_den}")
+            print(f"{p_value=:.5f}")
+            print(f"{decision=}")
+
+        return float(p_value)
+    
+    @staticmethod
+    def normality_tests(
+        data: np.typing.ArrayLike
+    ) -> dict:
+        """Perform multiple normality tests on a dataset and return comprehensive results.
+        
+        Conducts three statistical tests to assess whether a sample comes from a normally
+        distributed population:
+        1. Shapiro-Wilk (best for small to medium samples)
+        2. Kolmogorov-Smirnov (with sample parameters)
+        3. Anderson-Darling (with critical values for multiple significance levels)
+
+        Args:
+            data: Input array-like data to test. Can be numpy array, list, or tuple of floats.
+                Should contain at least 3 observations for Shapiro-Wilk and 5 for Anderson-Darling.
+
+        Returns:
+            Dictionary containing test results with structure:
+            {
+                'test_name': {
+                    'statistic': float,             # Test normality, closer to 1 means normal
+                    'p_value': float,               # Only for Shapiro-Wilk and KS
+                    'critical_values': tuple,       # Only for Anderson-Darling
+                    'significance_levels': tuple    # Only for Anderson-Darling
+                }
+            }
+
+        Raises:
+            ValueError: If input data contains less than 3 observations.
+            TypeError: If input data contains non-numeric values.
+        """
+        if len(data) < 3:
+            raise ValueError("Data must contain at least 3 observations for normality testing")
+        
+        if not all(isinstance(x, (int, float)) for x in data):
+            raise TypeError("All data elements must be numeric")
+
+        results: dict = {}
+
+        # Shapiro-Wilk (best for n <= 5000)
+        stat, p = shapiro(data)
+        results['shapiro-wilk'] = {
+            'statistic': float(stat),
+            'p_value': float(p),
+        }
+
+        # Kolmogorov-Smirnov (with estimated parameters)
+        mean, std = np.mean(data), np.std(data, ddof=1)
+        stat, p = kstest(data, 'norm', args=(mean, std))
+        results['kolmogorov-smirnov'] = {
+            'statistic': float(stat),
+            'p_value': float(p),
+        }
+
+        # Anderson-Darling (with critical value comparison)
+        ad_result = anderson(data, dist='norm')
+        results['anderson-darling'] = {
+            'statistic': float(ad_result.statistic),
+            'critical_values': tuple(ad_result.critical_values.tolist()),
+            'significance_levels': tuple(ad_result.significance_level.tolist()),
+        }
+
+        return results
+    # endregion: Hypothesis Test
+
     @staticmethod
     def get_outlier_limit(df: pd.Series) -> tuple:
         # IQR - InterQuartile Range method
