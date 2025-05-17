@@ -493,6 +493,83 @@ class StatisticsInfo:
         return float(p_value)
     
     @staticmethod
+    def compare_proportions_z_test(
+        success_count_1: int,
+        success_count_2: int,
+        size_1: int,
+        size_2: int,
+        significance: float,
+        alternative: Literal["two-sided", "left", "right"],
+        print_evaluation: bool = False,
+    ) -> dict:
+        """Perform a two-proportion z-test to compare success rates between two groups.
+
+        Conducts a hypothesis test comparing proportions from two independent samples using
+        normal approximation, it does not use Yates Correction
+
+        Args:
+            success_count_1: Number of successes in group 1
+            success_count_2: Number of successes in group 2
+            size_1: Total number of observations in group 1
+            size_2: Total number of observations in group 2
+            significance: Significance level (alpha) for hypothesis test
+            alternative: Type of alternative hypothesis:
+                "two-sided": test for difference in proportions (p1 ≠ p2)
+                "left": test if proportion 1 is less than proportion 2 (p1 < p2)
+                "right": test if proportion 1 is greater than proportion 2 (p1 > p2)
+            print_evaluation: If True, prints test statistics and decision
+
+        Returns:
+            float: The calculated p-value for the specified alternative hypothesis
+
+        Raises:
+            ValueError: If success counts are negative or sample sizes are non-positive
+            ValueError: If alternative hypothesis is not one of the specified options
+        """
+        # TODO: Fisher Test for small sample
+
+        # Validate inputs
+        if success_count_1 < 0 or success_count_2 < 0:
+            raise ValueError("Success counts cannot be negative")
+        if size_1 <= 0 or size_2 <= 0:
+            raise ValueError("Sample sizes must be positive")
+        
+        # Calculate proportions
+        p1 = success_count_1 / size_1
+        p2 = success_count_2 / size_2
+        p_pooled = (success_count_1 + success_count_2) / (size_1 + size_2)
+        
+        # Standard error calculation (with/without continuity correction)
+        # TODO: Yates continuity correction
+        # adj = 0.5 * (1/size_1 + 1/size_2)
+        # se = np.sqrt(p_pooled * (1 - p_pooled) * (1/size_1 + 1/size_2))
+        # z_num = abs(p1 - p2) - adj
+
+        se = np.sqrt(p_pooled * (1 - p_pooled) * (1/size_1 + 1/size_2))
+        z_num = abs(p1 - p2)
+        
+        z_stat = z_num / se
+        
+        # Calculate p-value based on alternative
+        match alternative:
+            case 'left':
+                p_value = norm.cdf((p1 - p2)/se)
+            case 'right':
+                p_value = norm.sf((p1 - p2)/se)
+            case 'two-sided':
+                p_value = 2 * (1 - norm.cdf(z_stat))
+            case _:
+                raise ValueError("Invalidade alternative: must be 'left', 'right' or 'two-sided'")
+        
+        if print_evaluation:
+            decision = "Reject H0" if p_value < significance else "Accept H0"
+            print(f"z_stat={z_stat:.4f}")
+            print(f"{p_value=:.5f}")
+            print(f"{decision=}")
+
+        return float(p_value)
+
+    @staticmethod
     def normality_tests(
         data: np.typing.ArrayLike
     ) -> dict:
