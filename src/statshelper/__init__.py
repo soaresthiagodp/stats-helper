@@ -1,1 +1,1 @@
-from statshelper.BaseStatistics import StatisticsInfo #noqa
+from statshelper.BaseStatistics import StatisticsInfo, Hypothesis #noqa

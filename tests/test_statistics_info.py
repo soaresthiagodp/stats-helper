@@ -3,36 +3,37 @@ import numpy as np
 import pandas as pd
 
 from statshelper import StatisticsInfo
+from statshelper.tools.validators import validate_and_convert_array
 
 class TestStatisticsInfo:
     # Test Utilities
     def test_validate_and_convert_array_valid(self):
         # Test with list
-        result = StatisticsInfo._validate_and_convert_array([1, 2, 3])
+        result = validate_and_convert_array([1, 2, 3])
         assert isinstance(result, np.ndarray)
         np.testing.assert_array_equal(result, np.array([1, 2, 3]))
         
         # Test with pandas Series
-        result = StatisticsInfo._validate_and_convert_array(pd.Series([4, 5, 6]))
+        result = validate_and_convert_array(pd.Series([4, 5, 6]))
         np.testing.assert_array_equal(result, np.array([4, 5, 6]))
         
         # Test with numpy array - now expecting float conversion
         input_arr = np.array([7, 8, 9])
-        result = StatisticsInfo._validate_and_convert_array(input_arr)
+        result = validate_and_convert_array(input_arr)
         np.testing.assert_array_equal(result, np.array([7., 8., 9.]))
     
     def test_validate_and_convert_array_invalid(self):
         # Test empty input
         with pytest.raises(ValueError):
-            StatisticsInfo._validate_and_convert_array([])
+            validate_and_convert_array([])
             
         # Test non-numeric input
         with pytest.raises(ValueError):
-            StatisticsInfo._validate_and_convert_array(['a', 'b', 'c'])
+            validate_and_convert_array(['a', 'b', 'c'])
             
         # Test mixed numeric and non-numeric
         with pytest.raises(ValueError):
-            StatisticsInfo._validate_and_convert_array([1, 2, 'three'])
+            validate_and_convert_array([1, 2, 'three'])
     
     def test_get_statistics(self):
         data = [10, 12, 14, 16, 18]
@@ -104,31 +105,6 @@ class TestStatisticsInfo:
         # Test invalid inputs
         with pytest.raises(ValueError):
             StatisticsInfo.calculate_mean_error(1.5, 30, 5)  # invalid confidence
-            
-    def test_calculate_mean_pvalue(self):
-        # Z-test two-sided
-        p_z = StatisticsInfo.calculate_mean_pvalue(
-            data_size=100,
-            sample_mean=105,
-            std_dev=15,
-            significance=0.05,
-            hypothesis_mean=100,
-            alternative="two-sided",
-            is_sample_std=False
-        )
-        assert p_z == pytest.approx(0.00085812, abs=0.0001)
-        
-        # t-test right-tailed
-        p_t = StatisticsInfo.calculate_mean_pvalue(
-            data_size=20,
-            sample_mean=22,
-            std_dev=5,
-            significance=0.05,
-            hypothesis_mean=20,
-            alternative="right",
-            is_sample_std=True
-        )
-        assert p_t == pytest.approx(0.0447, abs=0.001)
     
     # Test Proportion Related Functions
     def test_calculate_proportion_sample_size(self):
@@ -151,117 +127,6 @@ class TestStatisticsInfo:
         # Test small np
         with pytest.raises(ValueError):
             StatisticsInfo.calculate_proportion_error(0.95, 10, 0.1)
-    
-    def test_calculate_proportion_pvalue(self):
-        # Left-tailed test
-        p_left = StatisticsInfo.calculate_proportion_pvalue(
-            data_size=1000,
-            sample_proportion=0.48,
-            significance=0.05,
-            hypothesis_proportion=0.5,
-            alternative="left"
-        )
-        assert p_left == pytest.approx(0.102, abs=0.001)
-        
-        # Two-sided test
-        p_two = StatisticsInfo.calculate_proportion_pvalue(
-            data_size=1000,
-            sample_proportion=0.53,
-            significance=0.05,
-            hypothesis_proportion=0.5,
-            alternative="two-sided"
-        )
-        assert p_two == pytest.approx(0.05777, abs=0.001)
-
-    def test_compare_variances_f_test(self):
-        """Test with equal variances (should not reject null)."""
-        p_value = StatisticsInfo.compare_variances_f_test(
-            variance_1=4.0,
-            variance_2=4.0,
-            size_1=30,
-            size_2=30,
-            significance=0.05,
-            alternative="two-sided"
-        )
-        assert p_value == 1.0  # Exactly equal variances should give p=1
-
-        """Test with clearly unequal variances (should reject null)."""
-        p_value = StatisticsInfo.compare_variances_f_test(
-            variance_1=9.0,
-            variance_2=1.0,
-            size_1=30,
-            size_2=30,
-            significance=0.05,
-            alternative="two-sided"
-        )
-        assert p_value < 0.05
-
-        """Test right-tailed alternative (v1 > v2)."""
-        p_value = StatisticsInfo.compare_variances_f_test(
-            variance_1=5.0,
-            variance_2=2.0,
-            size_1=20,
-            size_2=20,
-            significance=0.05,
-            alternative="right"
-        )
-        # Should be significant since 5 > 2
-        assert p_value < 0.05
-
-        """Test left-tailed alternative (v1 < v2)."""
-        p_value = StatisticsInfo.compare_variances_f_test(
-            variance_1=2.0,
-            variance_2=5.0,
-            size_1=20,
-            size_2=20,
-            significance=0.05,
-            alternative="left"
-        )
-        # Should be significant since 2 < 5
-        assert p_value < 0.05
-
-    def test_normal_distribution(self):
-        """Test with normally distributed data."""
-        # Generate normal data
-        np.random.seed(42)
-        normal_data = np.random.normal(loc=0, scale=1, size=100)
-        
-        results = StatisticsInfo.normality_tests(normal_data)
-        
-        # Check all tests are present
-        assert set(results.keys()) == {'shapiro-wilk', 'kolmogorov-smirnov', 'anderson-darling'}
-        
-        # Shapiro-Wilk - should not reject normality
-        assert 0.9 <= results['shapiro-wilk']['statistic'] <= 1.0
-        assert results['shapiro-wilk']['p_value'] > 0.05
-        
-        # Kolmogorov-Smirnov - should not reject normality
-        assert results['kolmogorov-smirnov']['statistic'] < 0.1
-        assert results['kolmogorov-smirnov']['p_value'] > 0.05
-        
-        # Anderson-Darling - test statistic should be less than critical value at 5%
-        critical_5pct = results['anderson-darling']['critical_values'][2]  # 5% is at index 2
-        assert results['anderson-darling']['statistic'] < critical_5pct
-
-    def test_non_normal_distribution(self):
-        """Test with clearly non-normal data (exponential)."""
-        # Generate exponential data
-        np.random.seed(42)
-        exp_data = np.random.exponential(scale=1.0, size=100)
-        
-        results = StatisticsInfo.normality_tests(exp_data)
-        
-        # Shapiro-Wilk - should reject normality
-        assert results['shapiro-wilk']['statistic'] < 0.9
-        assert results['shapiro-wilk']['p_value'] <= 0.05
-        
-        # Kolmogorov-Smirnov - should reject normality
-        assert results['kolmogorov-smirnov']['statistic'] > 0.1
-        assert results['kolmogorov-smirnov']['p_value'] <= 0.05
-        
-        # Anderson-Darling - test statistic should exceed critical value at 5%
-        critical_5pct = results['anderson-darling']['critical_values'][2]
-        assert results['anderson-darling']['statistic'] > critical_5pct
 
     # Test Outlier Detection
     def test_get_outlier_limit(self):
