@@ -4,10 +4,12 @@ from typing import Literal
 
 import pandas as pd
 import numpy as np
-from scipy.stats import norm, f, t, shapiro, kstest, anderson, zscore
+from scipy.stats import norm, f, t, shapiro, kstest, anderson, zscore, ttest_ind, ttest_rel
 
 from statshelper.tools.validators import validate_and_convert_array
 
+
+# Parametric Class #TODO: Non-parametric
 class Hypothesis:
     @staticmethod
     def calculate_mean_pvalue(
@@ -28,14 +30,14 @@ class Hypothesis:
 
         Args:
             data_size: Sample size (n).
-            sample_mean: Observed sample mean (x).
+            sample_mean: Observed sample mean (data_1).
             std_dev: Standard deviation (sigma if population, s if sample).
             significance: Significance level (alpha) for the test.
             hypothesis_mean: Hypothesized population mean (mu0).
             alternative: Alternative hypothesis type:
-                - 'left': x < mu0 (one-tailed)
-                - 'right': x > mu0 (one-tailed)
-                - 'two-sided': x != mu0 (two-tailed)
+                - 'left': data_1 < mu0 (one-tailed)
+                - 'right': data_1 > mu0 (one-tailed)
+                - 'two-sided': data_1 != mu0 (two-tailed)
             is_sample_std: Whether std_dev is from sample (t-test if True else z-test)
             print_evaluation: If True, prints test statistics and decision.
 
@@ -65,12 +67,13 @@ class Hypothesis:
             case 'two-sided':
                 p_value = 2 * (1 - cdf(abs(stat)))
             case _:
-                raise ValueError("Invalidade alternative: must be 'left', 'right' or 'two-sided'")
+                raise ValueError("Invalid alternative: must be 'left', 'right' or 'two-sided'")
         
         if print_evaluation:
             decision = "Reject H0" if p_value < significance else "Accept H0"
             print(f"{'t' if is_sample_std else 'z'}_stat={stat:.4f}")
             print(f"{p_value=:.5f}")
+            print(f"{significance=:.5f}")
             print(f"{decision=}")
         
         return float(p_value)
@@ -120,12 +123,13 @@ class Hypothesis:
             case 'two-sided':
                 p_value = 2 * (1 - cdf(abs(stat)))
             case _:
-                raise ValueError("Invalidade alternative: must be 'left', 'right' or 'two-sided'")
+                raise ValueError("Invalid alternative: must be 'left', 'right' or 'two-sided'")
         
         if print_evaluation:
             decision = "Reject H0" if p_value < significance else "Accept H0"
             print(f"z_stat={stat:.4f}")
             print(f"{p_value=:.5f}")
+            print(f"{significance=:.5f}")
             print(f"{decision=}")
         
         return float(p_value)
@@ -196,16 +200,87 @@ class Hypothesis:
                 else:
                     p_value = 2 * f.cdf(f_stat, df_num, df_den)
             case _:
-                raise ValueError("Invalidade alternative: must be 'left', 'right' or 'two-sided'")
+                raise ValueError("Invalid alternative: must be 'left', 'right' or 'two-sided'")
 
         if print_evaluation:
             decision = "Reject H0" if p_value < significance else "Accept H0"
             print(f"F_stat={f_stat:.4f} df_num={df_num} df_den={df_den}")
             print(f"{p_value=:.5f}")
+            print(f"{significance=:.5f}")
             print(f"{decision=}")
 
         return float(p_value)
     
+    @staticmethod
+    def compare_means_t_test(
+        data_1: np.typing.ArrayLike,
+        data_2: np.typing.ArrayLike,
+        significance: float,
+        alternative: Literal["two-sided", "left", "right"] = 'two-sided',
+        paired: bool = False,
+        print_evaluation: bool = False,
+    ):
+        """Perform a t-test to compare means between two samples
+
+        Args:
+            data_1 : First sample data array
+            data_2 : Second sample data array
+            significance : Significance level
+            alternative : Literal["two-sided", "left", "right"]
+                Type of alternative hypothesis:
+                - "two-sided": means are not equal (default)
+                - "left": mean of data_1 is less than mean of data_2
+                - "right": mean of data_1 is greater than mean of data_2
+            paired : bool
+                Whether samples are paired/matched (e.g., before-after measurements).
+                If True, performs a paired t-test (dependent samples).
+            print_evaluation : bool, optional
+                If True, prints test details including t-statistic, p-value, and decision.
+                Default is False.
+
+        Returns:
+            float: The calculated p-value for the specified alternative hypothesis
+        """
+
+        arr_1 = validate_and_convert_array(data_1)
+        arr_2 = validate_and_convert_array(data_2)
+
+        f_test_pvalue = Hypothesis.compare_variances_f_test(
+            variance_1=np.var(arr_1),
+            variance_2=np.var(arr_2),
+            size_1=len(arr_1),
+            size_2=len(arr_2),
+            significance=significance,
+            alternative=alternative,
+        )
+        equal_var = False if f_test_pvalue < significance else True
+
+        if paired:
+            t_stat, p_value = ttest_rel(arr_1, arr_2)
+        else:
+            t_stat, p_value = ttest_ind(arr_1, arr_2, equal_var=equal_var)
+        
+        match alternative:
+            case 'left':
+                p_value = p_value/2 if t_stat < 0 else 1 - p_value/2
+            case 'right':
+                p_value = p_value/2 if t_stat > 0 else 1 - p_value/2
+            case 'two-sided':
+                pass # Just pass t_stat and p_value directly
+            case _:
+                raise ValueError("Invalid alternative: must be 'left', 'right' or 'two-sided'")
+                
+        if print_evaluation:
+            decision = "Reject H0" if p_value < significance else "Accept H0"
+            print(f"{equal_var=}")
+            print(f"{paired=}")
+            print(f"t_stat={t_stat:.4f}")
+            print(f"{p_value=:.5f}")
+            print(f"{significance=:.5f}")
+            print(f"{decision=}")
+
+        return p_value
+
     @staticmethod
     def compare_proportions_z_test(
         success_count_1: int,
@@ -273,12 +348,13 @@ class Hypothesis:
             case 'two-sided':
                 p_value = 2 * (1 - norm.cdf(z_stat))
             case _:
-                raise ValueError("Invalidade alternative: must be 'left', 'right' or 'two-sided'")
+                raise ValueError("Invalid alternative: must be 'left', 'right' or 'two-sided'")
         
         if print_evaluation:
             decision = "Reject H0" if p_value < significance else "Accept H0"
             print(f"z_stat={z_stat:.4f}")
             print(f"{p_value=:.5f}")
+            print(f"{significance=:.5f}")
             print(f"{decision=}")
 
         return float(p_value)

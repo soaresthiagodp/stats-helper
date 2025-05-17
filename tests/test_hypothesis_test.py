@@ -97,6 +97,19 @@ class TestHypothesis:
         # Should be significant since 2 < 5
         assert p_value < 0.05
 
+    def test_compare_means_t_test(self):
+        data_1 = [13, 19, 14, 17, 21, 24, 10, 14, 13, 15]
+        data_2 = [16, 14, 19, 18, 19, 20, 15, 18, 17, 18]
+        p_value = Hypothesis.compare_means_t_test(
+            data_1=data_1,
+            data_2=data_2,
+            significance=0.05,
+            alternative='two-sided',
+            paired=False
+        )
+
+        assert p_value == pytest.approx(0.35892, abs=0.01)
+
     def test_compare_proportions_z_test(self):
         p_value = Hypothesis.compare_proportions_z_test(
             success_count_1=26,
